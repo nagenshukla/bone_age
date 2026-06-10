@@ -70,7 +70,7 @@ python evaluate.py --checkpoint checkpoints/best_model.pth
 python evaluate.py --checkpoint checkpoints/best_model.pth --visualize
 ```
 
-## Expected Results
+## Minimum Expected Results
 
 | Metric | Value |
 |--------|-------|
@@ -86,7 +86,7 @@ python evaluate.py --checkpoint checkpoints/best_model.pth --visualize
 
 ## Kaggle Packaging (Model Upload)
 
-A ready-to-upload Kaggle dataset bundle is included at `kaggle_package/`.
+If you wish to share your model and inference code and keep the training related code separate, you can organize it as below. This is an example for kaggle but can apply anywhere you're democratizing access to your model weights + inference code and helping the community start from the best model you trained.
 
 ### Bundle Contents
 
