@@ -99,13 +99,16 @@ def main():
     )
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--visualize", action="store_true", help="Generate plots")
+    parser.add_argument("--no_preprocess", action="store_true", help="Disable bias-normalization preprocessing")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load data (validation split)
     _, val_df = load_dataframes(config.TRAIN_CSV, val_split=config.VAL_SPLIT, seed=config.SEED)
-    val_ds = BoneAgeDataset(val_df, config.TRAIN_IMG_DIR, transform=get_val_transforms())
+    preprocess = config.PREPROCESS and not args.no_preprocess
+    val_ds = BoneAgeDataset(val_df, config.TRAIN_IMG_DIR, transform=get_val_transforms(),
+                            preprocess=preprocess)
     num_workers = config.NUM_WORKERS
     if sys.platform == "win32":
         num_workers = 0

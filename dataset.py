@@ -22,11 +22,17 @@ class BoneAgeDataset(Dataset):
     """
 
     def __init__(self, df: pd.DataFrame, img_dir: str | Path, transform=None,
-                 base_size: int | None = None, cache_in_ram: bool = True):
+                 base_size: int | None = None, cache_in_ram: bool = True,
+                 preprocess: bool = False):
         self.df = df.reset_index(drop=True)
         self.img_dir = Path(img_dir)
         self.transform = transform
         self.cache_in_ram = cache_in_ram
+        self.preprocess = preprocess
+        self.base_size = base_size
+        if preprocess:  # lazy import so cv2 is only required when enabled
+            from preprocess import preprocess_xray
+            self._preprocess_xray = preprocess_xray
 
         # Pre-compute stats for optional normalization of targets
         self.age_mean = self.df["boneage"].mean()
@@ -58,9 +64,13 @@ class BoneAgeDataset(Dataset):
             def load_and_resize(idx):
                 row = self.df.iloc[idx]
                 img_path = self.img_dir / f"{int(row['id'])}.png"
-                img = Image.open(img_path).convert("RGB")
-                if resize_tf:
-                    img = resize_tf(img)
+                if self.preprocess:
+                    # pipeline handles grayscale, square pad, and resize itself
+                    img = self._preprocess_xray(img_path, out_size=base_size)
+                else:
+                    img = Image.open(img_path).convert("RGB")
+                    if resize_tf:
+                        img = resize_tf(img)
                 return idx, img
 
             # Pre-allocate cache list
@@ -91,7 +101,10 @@ class BoneAgeDataset(Dataset):
             image = self._cache[idx]
         else:
             img_path = self.img_dir / f"{int(row['id'])}.png"
-            image = Image.open(img_path).convert("RGB")
+            if self.preprocess:
+                image = self._preprocess_xray(img_path, out_size=self.base_size)
+            else:
+                image = Image.open(img_path).convert("RGB")
 
         if self.transform:
             image = self.transform(image)

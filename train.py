@@ -79,6 +79,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = config.USE_AMP and not args.no_amp and device.type == "cuda"
     accum_steps = args.grad_accum_steps
+    preprocess = config.PREPROCESS and not args.no_preprocess
 
     # Cap CUDA to dedicated VRAM only — prevent silent spill into shared memory
     if device.type == "cuda":
@@ -96,12 +97,15 @@ def main():
         config.TRAIN_CSV, val_split=args.val_split, seed=args.seed
     )
 
+    print(f"Bias-normalization preprocessing: {preprocess}")
     train_ds = BoneAgeDataset(train_df, config.TRAIN_IMG_DIR,
                                transform=get_train_transforms(skip_resize=True),
-                               base_size=args.img_size, cache_in_ram=True)
+                               base_size=args.img_size, cache_in_ram=True,
+                               preprocess=preprocess)
     val_ds = BoneAgeDataset(val_df, config.TRAIN_IMG_DIR,
                              transform=get_val_transforms(skip_resize=True),
-                             base_size=args.img_size, cache_in_ram=True)
+                             base_size=args.img_size, cache_in_ram=True,
+                             preprocess=preprocess)
 
     num_workers = args.num_workers
     if sys.platform == "win32" and num_workers > 0:

@@ -21,6 +21,12 @@ DROPOUT = 0.3
 # ── Data ───────────────────────────────────────────────────────────────────────
 IMG_SIZE = 500
 VAL_SPLIT = 0.15  # fraction of training data used for validation
+
+# ── Bias-normalization preprocessing ────────────────────────────────────────────
+PREPROCESS = True       # polarity + hand-crop + CLAHE pipeline (see preprocess.py)
+CLAHE_CLIP = 2.0
+CLAHE_GRID = 8
+N_MACHINE_CLUSTERS = 6  # pseudo-domain clusters for bias-aware evaluation
 NUM_WORKERS = min(4, os.cpu_count() // 4 or 1) if os.cpu_count() else 2
 PERSISTENT_WORKERS = True  # keep worker processes alive between batches (Windows-safe)
 
@@ -55,6 +61,7 @@ def parse_args():
     parser.add_argument("--val_split", type=float, default=VAL_SPLIT)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--no_amp", action="store_true", help="Disable mixed precision")
+    parser.add_argument("--no_preprocess", action="store_true", help="Disable bias-normalization preprocessing")
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
     parser.add_argument("--checkpoint", type=str, default=None, help="Resume from checkpoint")
     parser.add_argument("--compile", action="store_true", help="Compile model with torch.compile")
