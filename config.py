@@ -23,7 +23,7 @@ IMG_SIZE = 500
 VAL_SPLIT = 0.15  # fraction of training data used for validation
 
 # ── Bias-normalization preprocessing ────────────────────────────────────────────
-PREPROCESS = True       # polarity + hand-crop + CLAHE pipeline (see preprocess.py)
+PREPROCESS = False      # polarity + hand-crop + CLAHE pipeline (see preprocess.py); off: neutral on accuracy & machine bias
 CLAHE_CLIP = 2.0
 CLAHE_GRID = 8
 N_MACHINE_CLUSTERS = 6  # pseudo-domain clusters for bias-aware evaluation
@@ -64,6 +64,7 @@ def parse_args():
     parser.add_argument("--no_preprocess", action="store_true", help="Disable bias-normalization preprocessing")
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
     parser.add_argument("--checkpoint", type=str, default=None, help="Resume from checkpoint")
+    parser.add_argument("--tag", type=str, default="", help="Suffix for checkpoint filenames (e.g. _seed43 for ensemble members)")
     parser.add_argument("--compile", action="store_true", help="Compile model with torch.compile")
     parser.add_argument("--no_prefetch", action="store_true", help="Disable asynchronous CUDA data prefetching")
     return parser.parse_args()
