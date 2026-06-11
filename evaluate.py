@@ -18,7 +18,16 @@ from utils import load_checkpoint
 
 
 @torch.no_grad()
-def collect_predictions(model, loader, device):
+def tta_forward(model, images, genders):
+    """Average predictions over horizontal flip + small rotations (image-only TTA)."""
+    import torchvision.transforms.functional as TF
+    views = [images, torch.flip(images, dims=[3]),
+             TF.rotate(images, 10), TF.rotate(images, -10)]
+    return torch.stack([model(v, genders) for v in views], dim=0).mean(dim=0)
+
+
+@torch.no_grad()
+def collect_predictions(model, loader, device, tta=False):
     """Run inference on a dataloader, return (predictions, targets) in months."""
     model.eval()
     all_preds, all_targets = [], []
@@ -27,8 +36,8 @@ def collect_predictions(model, loader, device):
         images = images.to(device, non_blocking=True)
         genders = genders.to(device, non_blocking=True)
 
-        preds = model(images, genders).squeeze(1).cpu().numpy()
-        all_preds.append(preds)
+        out = tta_forward(model, images, genders) if tta else model(images, genders)
+        all_preds.append(out.squeeze(1).cpu().numpy())
         all_targets.append(targets.numpy())
 
     return np.concatenate(all_preds), np.concatenate(all_targets)
@@ -100,6 +109,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--visualize", action="store_true", help="Generate plots")
     parser.add_argument("--no_preprocess", action="store_true", help="Disable bias-normalization preprocessing")
+    parser.add_argument("--tta", action="store_true", help="Test-time augmentation (flip + rotations)")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -119,10 +129,14 @@ def main():
 
     # Load model
     model = BoneAgeModel(pretrained=False).to(device)
-    load_checkpoint(Path(args.checkpoint), model, device=device)
+    ckpt = load_checkpoint(Path(args.checkpoint), model, device=device)
+    target_mean = ckpt.get("target_mean", 0.0)
+    target_std = ckpt.get("target_std", 1.0)
 
-    # Predict
-    preds, targets = collect_predictions(model, val_loader, device)
+    # Predict (model outputs z-normalized space if trained that way; un-normalize.
+    # Eval dataset keeps targets in months, so only preds need un-normalizing.)
+    preds, targets = collect_predictions(model, val_loader, device, tta=args.tta)
+    preds = preds * target_std + target_mean
 
     # Metrics
     metrics = compute_metrics(preds, targets)

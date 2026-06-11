@@ -64,6 +64,7 @@ def main():
     p.add_argument("--batch_size", type=int, default=32)
     p.add_argument("--no_preprocess", action="store_true", help="Disable bias-normalization pipeline")
     p.add_argument("--n_clusters", type=int, default=config.N_MACHINE_CLUSTERS)
+    p.add_argument("--tta", action="store_true", help="Test-time augmentation (flip + rotations)")
     args = p.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -79,8 +80,11 @@ def main():
                             num_workers=num_workers, pin_memory=(device.type == "cuda"))
 
     model = BoneAgeModel(pretrained=False).to(device)
-    load_checkpoint(Path(args.checkpoint), model, device=device)
-    preds, targets = collect_predictions(model, val_loader, device)
+    ckpt = load_checkpoint(Path(args.checkpoint), model, device=device)
+    target_mean = ckpt.get("target_mean", 0.0)
+    target_std = ckpt.get("target_std", 1.0)
+    preds, targets = collect_predictions(model, val_loader, device, tta=args.tta)
+    preds = preds * target_std + target_mean
 
     abs_err = np.abs(preds - targets)
     signed_err = preds - targets
