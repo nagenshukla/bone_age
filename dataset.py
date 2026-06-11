@@ -23,13 +23,17 @@ class BoneAgeDataset(Dataset):
 
     def __init__(self, df: pd.DataFrame, img_dir: str | Path, transform=None,
                  base_size: int | None = None, cache_in_ram: bool = True,
-                 preprocess: bool = False):
+                 preprocess: bool = False,
+                 target_mean: float | None = None, target_std: float | None = None):
         self.df = df.reset_index(drop=True)
         self.img_dir = Path(img_dir)
         self.transform = transform
         self.cache_in_ram = cache_in_ram
         self.preprocess = preprocess
         self.base_size = base_size
+        # If set (from TRAIN-split stats), targets are returned z-normalized.
+        self.target_mean = target_mean
+        self.target_std = target_std
         if preprocess:  # lazy import so cv2 is only required when enabled
             from preprocess import preprocess_xray
             self._preprocess_xray = preprocess_xray
@@ -112,8 +116,11 @@ class BoneAgeDataset(Dataset):
         # Gender: 1 = male, 0 = female
         gender = torch.tensor([float(row["male"])], dtype=torch.float32)
 
-        # Target: bone age in months
-        bone_age = torch.tensor(row["boneage"], dtype=torch.float32)
+        # Target: bone age in months (optionally z-normalized using train stats)
+        age = float(row["boneage"])
+        if self.target_mean is not None:
+            age = (age - self.target_mean) / self.target_std
+        bone_age = torch.tensor(age, dtype=torch.float32)
 
         return image, gender, bone_age
 
