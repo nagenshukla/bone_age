@@ -1,9 +1,10 @@
 """Training loop with two-phase strategy and mixed precision."""
 
 import sys
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.amp import GradScaler
 from tqdm import tqdm
 
@@ -15,15 +16,18 @@ from model import BoneAgeModel
 from utils import set_seed, save_checkpoint, load_checkpoint, EarlyStopping, AverageMeter, CudaPrefetcher
 
 
-def train_one_epoch(model, loader, optimizer, scaler, device, use_amp, accum_steps=1):
-    """Run one training epoch with gradient accumulation. Returns average loss."""
+def train_one_epoch(model, loader, optimizer, scaler, device, use_amp, accum_steps=1, target_std=1.0):
+    """Run one training epoch with gradient accumulation. Returns average loss (months)."""
     model.train()
     loss_meter = AverageMeter()
     criterion = nn.L1Loss()
 
     optimizer.zero_grad(set_to_none=True)
 
-    pbar = tqdm(loader, desc="  Train", leave=False, file=sys.stdout)
+    # Disable the live bar when stdout is redirected to a file (keeps logs tiny);
+    # interactive terminals still get the progress bar.
+    pbar = tqdm(loader, desc="  Train", leave=False, file=sys.stdout,
+                disable=not sys.stdout.isatty())
     for i, (images, genders, targets) in enumerate(pbar):
         images = images.to(device, non_blocking=True)
         genders = genders.to(device, non_blocking=True)
@@ -40,7 +44,7 @@ def train_one_epoch(model, loader, optimizer, scaler, device, use_amp, accum_ste
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
 
-        loss_meter.update(loss.item() * accum_steps, images.size(0))  # log unscaled loss
+        loss_meter.update(loss.item() * accum_steps * target_std, images.size(0))  # log in months
         pbar.set_postfix(loss=f"{loss_meter.avg:.2f}")
 
     # Handle remaining gradients if dataset isn't divisible by accum_steps
@@ -53,8 +57,12 @@ def train_one_epoch(model, loader, optimizer, scaler, device, use_amp, accum_ste
 
 
 @torch.no_grad()
-def validate(model, loader, device, use_amp):
-    """Run validation. Returns average MAE (MAD) in months."""
+def validate(model, loader, device, use_amp, target_std=1.0):
+    """Run validation. Returns average MAE (MAD) in months.
+
+    Targets/preds are in z-normalized space when target_std != 1; since the
+    transform is linear, MAD in months = MAD_normalized * target_std.
+    """
     model.eval()
     mad_meter = AverageMeter()
 
@@ -69,7 +77,7 @@ def validate(model, loader, device, use_amp):
         mae = torch.abs(preds - targets).mean().item()
         mad_meter.update(mae, images.size(0))
 
-    return mad_meter.avg
+    return mad_meter.avg * target_std
 
 
 def main():
@@ -97,15 +105,34 @@ def main():
         config.TRAIN_CSV, val_split=args.val_split, seed=args.seed
     )
 
+    # Target z-normalization stats computed on the TRAIN split only.
+    target_mean = float(train_df["boneage"].mean())
+    target_std = float(train_df["boneage"].std())
+    ckpt_extra = {"target_mean": target_mean, "target_std": target_std}
+    best_path = config.CHECKPOINT_DIR / f"best_model{args.tag}.pth"
+    final_path = config.CHECKPOINT_DIR / f"final_model{args.tag}.pth"
+    print(f"Target normalization: mean={target_mean:.1f}, std={target_std:.1f} months")
+
     print(f"Bias-normalization preprocessing: {preprocess}")
     train_ds = BoneAgeDataset(train_df, config.TRAIN_IMG_DIR,
                                transform=get_train_transforms(skip_resize=True),
                                base_size=args.img_size, cache_in_ram=True,
-                               preprocess=preprocess)
+                               preprocess=preprocess,
+                               target_mean=target_mean, target_std=target_std)
     val_ds = BoneAgeDataset(val_df, config.TRAIN_IMG_DIR,
                              transform=get_val_transforms(skip_resize=True),
                              base_size=args.img_size, cache_in_ram=True,
-                             preprocess=preprocess)
+                             preprocess=preprocess,
+                             target_mean=target_mean, target_std=target_std)
+
+    # Age-balanced sampling to counter regression-to-the-mean at age extremes.
+    ages = train_df["boneage"].to_numpy()
+    age_edges = np.array([0, 48, 96, 144, 192])  # months: 0-4, 4-8, 8-12, 12-16, 16y+
+    bin_idx = np.clip(np.digitize(ages, age_edges) - 1, 0, len(age_edges) - 1)
+    counts = np.bincount(bin_idx, minlength=len(age_edges))
+    sample_weights = torch.as_tensor((1.0 / np.maximum(counts, 1))[bin_idx], dtype=torch.double)
+    train_sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+    print(f"Age-balanced sampler: bin counts {counts.tolist()}")
 
     num_workers = args.num_workers
     if sys.platform == "win32" and num_workers > 0:
@@ -117,7 +144,7 @@ def main():
     train_loader = DataLoader(
         train_ds,
         batch_size=args.batch_size,
-        shuffle=True,
+        sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=pin_memory,
         drop_last=True,
@@ -149,9 +176,8 @@ def main():
     best_mad = float("inf")
 
     if args.checkpoint:
-        start_epoch, best_mad = load_checkpoint(
-            args.checkpoint, model, device=device
-        )
+        ckpt = load_checkpoint(args.checkpoint, model, device=device)
+        start_epoch, best_mad = ckpt["epoch"], ckpt["val_mad"]
 
     if args.compile:
         print("Compiling model components with torch.compile()...")
@@ -172,15 +198,16 @@ def main():
 
     for epoch in range(start_epoch, args.warmup_epochs):
         print(f"\nEpoch {epoch+1}/{args.warmup_epochs}")
-        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, use_amp, accum_steps)
-        val_mad = validate(model, val_loader, device, use_amp)
+        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, use_amp, accum_steps, target_std)
+        val_mad = validate(model, val_loader, device, use_amp, target_std)
         print(f"  Train Loss: {train_loss:.2f} | Val MAD: {val_mad:.2f} months")
 
         if val_mad < best_mad:
             best_mad = val_mad
             save_checkpoint(
                 model, optimizer, epoch,
-                val_mad, config.CHECKPOINT_DIR / "best_model.pth",
+                val_mad, best_path,
+                extra=ckpt_extra,
             )
 
     # ── Phase 2: Fine-tune (full model) ────────────────────────────────────
@@ -203,8 +230,8 @@ def main():
 
     for epoch in range(args.warmup_epochs, args.epochs):
         print(f"\nEpoch {epoch+1}/{args.epochs}")
-        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, use_amp, accum_steps)
-        val_mad = validate(model, val_loader, device, use_amp)
+        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, use_amp, accum_steps, target_std)
+        val_mad = validate(model, val_loader, device, use_amp, target_std)
         scheduler.step()
 
         lr_now = optimizer.param_groups[0]["lr"]
@@ -214,7 +241,8 @@ def main():
             best_mad = val_mad
             save_checkpoint(
                 model, optimizer, epoch,
-                val_mad, config.CHECKPOINT_DIR / "best_model.pth",
+                val_mad, best_path,
+                extra=ckpt_extra,
             )
 
         if early_stop(val_mad):
@@ -224,7 +252,8 @@ def main():
     # Save final model regardless
     save_checkpoint(
         model, optimizer, epoch,
-        val_mad, config.CHECKPOINT_DIR / "final_model.pth",
+        val_mad, final_path,
+        extra=ckpt_extra,
     )
 
     print(f"\n{'='*60}")
