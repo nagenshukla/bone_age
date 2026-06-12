@@ -16,29 +16,52 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = True  # auto-tune convolutions for fixed input size
 
 
-def save_checkpoint(model, optimizer, epoch, val_mad, path: Path):
-    """Save model + optimizer state."""
+def save_checkpoint(model, optimizer, epoch, val_mad, path: Path, extra: dict = None):
+    """Save model + optimizer state. `extra` merges in things like target stats."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "val_mad": val_mad,
-        },
-        path,
-    )
+    state = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "val_mad": val_mad,
+    }
+    if extra:
+        state.update(extra)
+    torch.save(state, path)
     print(f"  Checkpoint saved -> {path}  (MAD={val_mad:.2f} months)")
 
 
 def load_checkpoint(path: Path, model, optimizer=None, device="cuda"):
-    """Load model (and optionally optimizer) from checkpoint."""
+    """Load model (and optionally optimizer). Returns the full checkpoint dict."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     if optimizer and "optimizer_state_dict" in ckpt:
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
     print(f"  Loaded checkpoint from epoch {ckpt['epoch']} (MAD={ckpt['val_mad']:.2f})")
-    return ckpt["epoch"], ckpt["val_mad"]
+    return ckpt
+
+
+class EMA:
+    """Exponential moving average of model weights.
+
+    Maintains a shadow copy updated after each optimizer step. The averaged
+    weights generalize better and are what we validate on / save / deploy.
+    """
+
+    def __init__(self, model, decay: float = 0.999):
+        self.decay = decay
+        self.shadow = {k: v.detach().clone() for k, v in model.state_dict().items()}
+
+    @torch.no_grad()
+    def update(self, model):
+        for k, v in model.state_dict().items():
+            if v.dtype.is_floating_point:
+                self.shadow[k].mul_(self.decay).add_(v.detach(), alpha=1.0 - self.decay)
+            else:  # integer buffers (e.g. BN num_batches_tracked) copied directly
+                self.shadow[k].copy_(v)
+
+    def copy_to(self, model):
+        model.load_state_dict(self.shadow, strict=True)
 
 
 class EarlyStopping:
