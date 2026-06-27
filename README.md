@@ -35,31 +35,31 @@ Pediatric bone age is normally read by radiologists comparing a hand X-ray again
 
 ## Quick Start
 
+### 1. Install
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download the RSNA Bone Age Dataset
+### 2. Get the RSNA Bone Age dataset
 
-You need a [Kaggle account](https://www.kaggle.com/) and the Kaggle CLI.
+You'll need a [Kaggle account](https://www.kaggle.com/) and the Kaggle CLI (included in `requirements.txt`). Place your `kaggle.json` API key at `~/.kaggle/kaggle.json`, then:
 
 ```bash
-# Install Kaggle CLI (included in requirements.txt)
-# Place your kaggle.json API key in ~/.kaggle/kaggle.json
-
-# Download the dataset
 kaggle competitions download -c rsna-bone-age -p ./data/
-
-# Extract
-cd data
-unzip rsna-bone-age.zip
-# This creates:
-#   data/boneage-training-dataset/       (training images)
-#   data/boneage-validation-dataset/     (validation images -- no labels on Kaggle)
-#   data/boneage-training-dataset.csv    (training labels)
+cd data && unzip rsna-bone-age.zip
 ```
 
-**Alternative**: Download directly from https://www.kaggle.com/competitions/rsna-bone-age
+This creates:
+
+```
+data/
+├── boneage-training-dataset/       # ~12,611 .png images
+├── boneage-training-dataset.csv    # id, boneage, male
+└── boneage-validation-dataset/     # validation images (no labels on Kaggle)
+```
+
+You can also grab it directly from <https://www.kaggle.com/competitions/rsna-bone-age>.
 
 ### 3. Directory Structure After Download
 
