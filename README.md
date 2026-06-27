@@ -75,7 +75,7 @@ bone_age/
 ├── ...
 ```
 
-### 3. Train
+### 4. Train
 
 ```bash
 # default config
@@ -85,7 +85,7 @@ python train.py
 python train.py --epochs 40 --batch_size 16 --lr 1e-4
 ```
 
-### 4. Evaluate
+### 5. Evaluate
 
 ```bash
 python evaluate.py --checkpoint checkpoints/best_model.pth
