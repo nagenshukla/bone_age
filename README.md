@@ -1,10 +1,14 @@
 # Bone Age Assessment — EfficientNet-B4
 
-Deep learning model for pediatric bone age estimation from hand X-ray images.
+> Deep learning model for pediatric bone age estimation from hand X-ray images.
 
-## Setup
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![PyTorch](https://img.shields.io/badge/pytorch-2.0%2B-ee4c2c)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Dataset](https://img.shields.io/badge/dataset-RSNA%20Bone%20Age-orange)
 
-### 1. Install Dependencies
+Pediatric bone age is normally read by radiologists comparing a hand X-ray against the Greulich & Pyle atlas — a slow, subjective process. This repo trains an EfficientNet-B4 regression model on the RSNA Bone Age challenge data and reaches **~4–5 months MAD** on the validation split, competitive with the top entries from the original 2017 challenge.
+
 
 ```bash
 pip install -r requirements.txt
