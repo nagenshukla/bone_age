@@ -75,7 +75,7 @@ bone_age/
 ├── ...
 ```
 
-### 3. Train
+### 4. Train
 
 ```bash
 # default config
@@ -85,7 +85,7 @@ python train.py
 python train.py --epochs 40 --batch_size 16 --lr 1e-4
 ```
 
-### 4. Evaluate
+### 5. Evaluate
 
 ```bash
 python evaluate.py --checkpoint checkpoints/best_model.pth
@@ -150,8 +150,18 @@ python /kaggle/input/bone-age-efficientnet-b4-model/code/inference.py \
     --weights /kaggle/input/bone-age-efficientnet-b4-model/best_model.pth
 ```
 
+
 ## References
 
+- Tan & Le, **EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks** — <https://arxiv.org/abs/1905.11946>
+- Halabi et al., **The RSNA Pediatric Bone Age Machine Learning Challenge** (2019) — <https://doi.org/10.1148/radiol.2018180736>
+- Greulich & Pyle, *Radiographic Atlas of Skeletal Development of the Hand and Wrist*
 
-- EfficientNet: https://arxiv.org/abs/1905.11946
-- Greulich & Pyle bone age atlas
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+> ⚠️ **Not a medical device.** This is a research project. Do not use for clinical decisions.
+
