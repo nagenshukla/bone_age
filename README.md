@@ -75,60 +75,43 @@ bone_age/
 ├── ...
 ```
 
-## Training
+### 3. Train
 
 ```bash
-# Train with default settings
+# default config
 python train.py
 
-# Override config via CLI
+# override via CLI
 python train.py --epochs 40 --batch_size 16 --lr 1e-4
 ```
 
-Training runs in two phases:
-1. **Warmup** (5 epochs): backbone frozen, only the regression head trains
-2. **Fine-tune** (remaining epochs): full model with cosine annealing LR
-
-## Evaluation
+### 4. Evaluate
 
 ```bash
-# Evaluate a trained model on the validation set
 python evaluate.py --checkpoint checkpoints/best_model.pth
 
-# Generate prediction visualizations
+# with prediction visualizations
 python evaluate.py --checkpoint checkpoints/best_model.pth --visualize
 ```
 
-## Minimum Expected Results
+---
 
-| Metric | Value |
-|--------|-------|
-| MAD (Mean Absolute Deviation) | ~4.0–5.0 months |
-| RMSE | ~5.5–7.0 months |
-
-## Model Architecture
-
-- **Backbone**: EfficientNet-B4 pretrained on ImageNet
-- **Gender fusion**: gender (binary) concatenated with image features after global average pooling
-- **Head**: FC(1793→512) → ReLU → Dropout(0.3) → FC(512→1)
-- **Output**: Predicted bone age in months
-
-## Kaggle Packaging (Model Upload)
-
-If you wish to share your model and inference code and keep the training related code separate, you can organize it as below. This is an example for kaggle but can apply anywhere you're democratizing access to your model weights + inference code and helping the community start from the best model you trained.
-
-### Bundle Contents
+## Repo Layout
 
 ```
-kaggle_package/
-├── dataset-metadata.json
-├── README.md
-├── best_model.pth
-├── final_model.pth
-└── code/
-		├── inference.py
-		└── requirements.txt
+bone_age/
+├── config.py             # hyperparameters
+├── dataset.py            # RSNA loader + augmentation
+├── transforms.py         # X-ray-specific transforms
+├── model.py              # EfficientNet-B4 + gender fusion head
+├── train.py              # 2-phase training loop
+├── evaluate.py           # MAD/RMSE on validation set
+├── evaluate_bias.py      # error breakdown by age / sex
+├── ensemble_eval.py      # multi-checkpoint ensembling
+├── bone_age_analysis.ipynb
+└── checkpoints/          # auto-created during training
 ```
+
 
 ### Publish to Kaggle
 
