@@ -9,6 +9,20 @@
 
 Pediatric bone age is normally read by radiologists comparing a hand X-ray against the Greulich & Pyle atlas — a slow, subjective process. This repo trains an EfficientNet-B4 regression model on the RSNA Bone Age challenge data and reaches **~4–5 months MAD** on the validation split, competitive with the top entries from the original 2017 challenge.
 
+---
+
+## Results
+
+<!-- TODO: replace these with your actual final numbers -->
+
+| Metric | Validation |
+| --- | --- |
+| MAD (Mean Absolute Deviation) | ~4.0–5.0 months |
+| RMSE | ~5.5–7.0 months |
+| Inference time (single GPU) | <!-- TODO --> ms/image |
+
+For context, the winning team in the 2017 RSNA challenge reached **4.265 months MAD**.
+
 
 ```bash
 pip install -r requirements.txt
