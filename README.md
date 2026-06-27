@@ -21,8 +21,19 @@ Pediatric bone age is normally read by radiologists comparing a hand X-ray again
 | RMSE | ~5.5–7.0 months |
 | Inference time (single GPU) | <!-- TODO --> ms/image |
 
-For context, the winning team in the 2017 RSNA challenge reached **4.265 months MAD**.
+---
 
+## Model Architecture
+
+- **Backbone:** EfficientNet-B4 pretrained on ImageNet
+- **Gender fusion:** binary gender flag concatenated with image features after global average pooling
+- **Head:** `FC(1793 → 512) → ReLU → Dropout(0.3) → FC(512 → 1)`
+- **Output:** predicted bone age in months
+- **Training schedule:** 5-epoch warmup with frozen backbone → full fine-tune with cosine-annealed LR
+
+---
+
+## Quick Start
 
 ```bash
 pip install -r requirements.txt
