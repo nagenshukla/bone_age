@@ -75,49 +75,49 @@ bone_age/
 ├── ...
 ```
 
-## Training
+### 3. Train
 
 ```bash
-# Train with default settings
+# default config
 python train.py
 
-# Override config via CLI
+# override via CLI
 python train.py --epochs 40 --batch_size 16 --lr 1e-4
 ```
 
-Training runs in two phases:
-1. **Warmup** (5 epochs): backbone frozen, only the regression head trains
-2. **Fine-tune** (remaining epochs): full model with cosine annealing LR
-
-## Evaluation
+### 4. Evaluate
 
 ```bash
-# Evaluate a trained model on the validation set
 python evaluate.py --checkpoint checkpoints/best_model.pth
 
-# Generate prediction visualizations
+# with prediction visualizations
 python evaluate.py --checkpoint checkpoints/best_model.pth --visualize
 ```
 
-## Minimum Expected Results
+---
 
-| Metric | Value |
-|--------|-------|
-| MAD (Mean Absolute Deviation) | ~4.0–5.0 months |
-| RMSE | ~5.5–7.0 months |
+## Repo Layout
 
-## Model Architecture
+```
+bone_age/
+├── config.py             # hyperparameters
+├── dataset.py            # RSNA loader + augmentation
+├── transforms.py         # X-ray-specific transforms
+├── model.py              # EfficientNet-B4 + gender fusion head
+├── train.py              # 2-phase training loop
+├── evaluate.py           # MAD/RMSE on validation set
+├── evaluate_bias.py      # error breakdown by age / sex
+├── ensemble_eval.py      # multi-checkpoint ensembling
+├── bone_age_analysis.ipynb
+└── checkpoints/          # auto-created during training
+```
 
-- **Backbone**: EfficientNet-B4 pretrained on ImageNet
-- **Gender fusion**: gender (binary) concatenated with image features after global average pooling
-- **Head**: FC(1793→512) → ReLU → Dropout(0.3) → FC(512→1)
-- **Output**: Predicted bone age in months
 
-## Kaggle Packaging (Model Upload)
+---
 
-If you wish to share your model and inference code and keep the training related code separate, you can organize it as below. This is an example for kaggle but can apply anywhere you're democratizing access to your model weights + inference code and helping the community start from the best model you trained.
+## Sharing Your Trained Model on Kaggle
 
-### Bundle Contents
+If you want to publish your weights + inference code as a Kaggle dataset so others can build on it, organize the bundle like this:
 
 ```
 kaggle_package/
@@ -126,33 +126,28 @@ kaggle_package/
 ├── best_model.pth
 ├── final_model.pth
 └── code/
-		├── inference.py
-		└── requirements.txt
+    ├── inference.py
+    └── requirements.txt
 ```
 
-### Publish to Kaggle
-
-1. Edit `kaggle_package/dataset-metadata.json` and replace `YOUR_KAGGLE_USERNAME`.
-2. Create dataset:
+Edit `dataset-metadata.json` to set your Kaggle username, then:
 
 ```bash
+# create
 kaggle datasets create -p kaggle_package
+
+# update later
+kaggle datasets version -p kaggle_package -m "update weights"
 ```
 
-3. Publish updates later:
-
-```bash
-kaggle datasets version -p kaggle_package -m "update model weights or docs"
-```
-
-### Use in a Kaggle Notebook
+Use it from a Kaggle notebook:
 
 ```bash
 pip install -r /kaggle/input/bone-age-efficientnet-b4-model/code/requirements.txt
 python /kaggle/input/bone-age-efficientnet-b4-model/code/inference.py \
-	--image /kaggle/input/YOUR_IMAGE_DATASET/12345.png \
-	--male 1 \
-	--weights /kaggle/input/bone-age-efficientnet-b4-model/best_model.pth
+    --image /kaggle/input/YOUR_IMAGE_DATASET/12345.png \
+    --male 1 \
+    --weights /kaggle/input/bone-age-efficientnet-b4-model/best_model.pth
 ```
 
 ## References
