@@ -9,32 +9,57 @@
 
 Pediatric bone age is normally read by radiologists comparing a hand X-ray against the Greulich & Pyle atlas — a slow, subjective process. This repo trains an EfficientNet-B4 regression model on the RSNA Bone Age challenge data and reaches **~4–5 months MAD** on the validation split, competitive with the top entries from the original 2017 challenge.
 
+---
+
+## Results
+
+<!-- TODO: replace these with your actual final numbers -->
+
+| Metric | Validation |
+| --- | --- |
+| MAD (Mean Absolute Deviation) | ~4.0–5.0 months |
+| RMSE | ~5.5–7.0 months |
+| Inference time (single GPU) | <!-- TODO --> ms/image |
+
+---
+
+## Model Architecture
+
+- **Backbone:** EfficientNet-B4 pretrained on ImageNet
+- **Gender fusion:** binary gender flag concatenated with image features after global average pooling
+- **Head:** `FC(1793 → 512) → ReLU → Dropout(0.3) → FC(512 → 1)`
+- **Output:** predicted bone age in months
+- **Training schedule:** 5-epoch warmup with frozen backbone → full fine-tune with cosine-annealed LR
+
+---
+
+## Quick Start
+
+### 1. Install
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download the RSNA Bone Age Dataset
+### 2. Get the RSNA Bone Age dataset
 
-You need a [Kaggle account](https://www.kaggle.com/) and the Kaggle CLI.
+You'll need a [Kaggle account](https://www.kaggle.com/) and the Kaggle CLI (included in `requirements.txt`). Place your `kaggle.json` API key at `~/.kaggle/kaggle.json`, then:
 
 ```bash
-# Install Kaggle CLI (included in requirements.txt)
-# Place your kaggle.json API key in ~/.kaggle/kaggle.json
-
-# Download the dataset
 kaggle competitions download -c rsna-bone-age -p ./data/
-
-# Extract
-cd data
-unzip rsna-bone-age.zip
-# This creates:
-#   data/boneage-training-dataset/       (training images)
-#   data/boneage-validation-dataset/     (validation images -- no labels on Kaggle)
-#   data/boneage-training-dataset.csv    (training labels)
+cd data && unzip rsna-bone-age.zip
 ```
 
-**Alternative**: Download directly from https://www.kaggle.com/competitions/rsna-bone-age
+This creates:
+
+```
+data/
+├── boneage-training-dataset/       # ~12,611 .png images
+├── boneage-training-dataset.csv    # id, boneage, male
+└── boneage-validation-dataset/     # validation images (no labels on Kaggle)
+```
+
+You can also grab it directly from <https://www.kaggle.com/competitions/rsna-bone-age>.
 
 ### 3. Directory Structure After Download
 
