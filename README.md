@@ -113,29 +113,41 @@ bone_age/
 ```
 
 
-### Publish to Kaggle
+---
 
-1. Edit `kaggle_package/dataset-metadata.json` and replace `YOUR_KAGGLE_USERNAME`.
-2. Create dataset:
+## Sharing Your Trained Model on Kaggle
+
+If you want to publish your weights + inference code as a Kaggle dataset so others can build on it, organize the bundle like this:
+
+```
+kaggle_package/
+├── dataset-metadata.json
+├── README.md
+├── best_model.pth
+├── final_model.pth
+└── code/
+    ├── inference.py
+    └── requirements.txt
+```
+
+Edit `dataset-metadata.json` to set your Kaggle username, then:
 
 ```bash
+# create
 kaggle datasets create -p kaggle_package
+
+# update later
+kaggle datasets version -p kaggle_package -m "update weights"
 ```
 
-3. Publish updates later:
-
-```bash
-kaggle datasets version -p kaggle_package -m "update model weights or docs"
-```
-
-### Use in a Kaggle Notebook
+Use it from a Kaggle notebook:
 
 ```bash
 pip install -r /kaggle/input/bone-age-efficientnet-b4-model/code/requirements.txt
 python /kaggle/input/bone-age-efficientnet-b4-model/code/inference.py \
-	--image /kaggle/input/YOUR_IMAGE_DATASET/12345.png \
-	--male 1 \
-	--weights /kaggle/input/bone-age-efficientnet-b4-model/best_model.pth
+    --image /kaggle/input/YOUR_IMAGE_DATASET/12345.png \
+    --male 1 \
+    --weights /kaggle/input/bone-age-efficientnet-b4-model/best_model.pth
 ```
 
 ## References
